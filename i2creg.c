@@ -119,17 +119,31 @@ void i2c_clean_bit_field(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t base,
 }
 
 
-void i2c_set_bit(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t base) {
+void i2c_set_one_bit(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t base) {
     uint8_t rdata = i2c_read_reg(i2c, addr, reg);
     rdata |= (1 << base);
     i2c_write_reg(i2c, addr, reg, rdata);
 }
 
-void i2c_clean_bit(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t base) {
+void i2c_clean_one_bit(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t base) {
     uint8_t rdata = i2c_read_reg(i2c, addr, reg);
     rdata &= ~(1 << base);
     i2c_write_reg(i2c, addr, reg, rdata);
 }
+
+
+void i2c_set_bit(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t mask) {
+    uint8_t rdata = i2c_read_reg(i2c, addr, reg);
+    rdata |= mask;
+    i2c_write_reg(i2c, addr, reg, rdata);
+}
+
+void i2c_clean_bit(uint32_t i2c, uint16_t addr, uint8_t reg, uint8_t mask) {
+    uint8_t rdata = i2c_read_reg(i2c, addr, reg);
+    rdata &= ~(mask);
+    i2c_write_reg(i2c, addr, reg, rdata);
+}
+
 
 
 #if 0
