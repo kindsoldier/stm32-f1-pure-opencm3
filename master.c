@@ -267,31 +267,12 @@ int main(void) {
 
     memset(array, 0, 612);
 
-    if (sd_cmd9(array) == 0x00) {
-        for (uint16_t n = 0; n < 51; n++)
-            printf("%02X ", array[n]);
-    }
-
-    if (sd_cmd10(array) == 0x00) {
-        for (uint16_t n = 0; n < 51; n++)
-            printf("%02X ", array[n]);
-    }
-
-
     delay(1000);
     memset(array, 0, 612);
 
-    if (sd_cmd17(1, array) == 0x00) {
-        for (uint16_t n1 = 0; n1 < 51; n1++)
-            printf("%02X ", array[n1]);
-    }
-
-
-    printf("\r\n");
-
     while (1) {
 
-#define STR_LEN 12
+        #define STR_LEN 12
 
         uint8_t str[STR_LEN + 1];
 
