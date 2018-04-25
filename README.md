@@ -15,7 +15,7 @@ Released
 
 No guarantees. This code is given only as an sample.
 
-But must work good. =) I try to write/publish a 'robust' code.
+But must work good. =) I try to publish a good code.
 
 Also can see http://wiki.unix7.org/mcu/start
 
