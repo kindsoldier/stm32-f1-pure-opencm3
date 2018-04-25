@@ -19,6 +19,32 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/*
+    void tim3_setup(void) {
+        nvic_enable_irq(NVIC_TIM3_IRQ);
+
+        timer_reset(TIM3);
+        timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+
+        timer_direction_up(TIM3);
+        timer_set_prescaler(TIM3, 50);
+        timer_disable_preload(TIM3);
+        timer_continuous_mode(TIM3);
+        timer_set_period(TIM3, 28200);
+        timer_set_oc_value(TIM3, TIM_OC1, 1);
+        timer_enable_irq(TIM3, TIM_DIER_CC1IE);
+
+        timer_enable_counter(TIM3);
+    }
+
+    void tim3_isr(void) {
+        if (timer_get_flag(TIM3, TIM_SR_CC1IF)) {
+            timer_clear_flag(TIM3, TIM_SR_CC1IF);
+            mpu_update_quaternion(&mpu);
+        }
+    }
+ */
+
 inline void _delay_ms(uint16_t ms) {
     for (volatile int i = 0; i < ms * 800; i++)
         __asm__("nop");
