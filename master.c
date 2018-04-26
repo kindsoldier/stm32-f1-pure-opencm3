@@ -12,6 +12,7 @@
 #include <libopencm3/stm32/rtc.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/dma.h>
+#include <libopencm3/cm3/systick.h>
 
 
 #include <libopencm3/usb/usbd.h>
@@ -38,7 +39,21 @@
 #include <st7735.h>
 #include <console.h>
 
-#include <sdcard.h>
+#include <i2creg.h>
+#include <mpu6050.h>
+
+mpu_t mpu = {
+    .i2c = I2C1,
+    .addr = 0x68,
+    .q0 = 1.0,
+    .q1 = 0.0,
+    .q2 = 0.0,
+    .q3 = 0.0,
+    .integralFBx = 0.0,
+    .integralFBy = 0.0,
+    .integralFBz = 0.0
+};
+
 
 void delay(uint32_t n) {
     for (volatile int i = 0; i < n; i++)
@@ -48,14 +63,16 @@ void delay(uint32_t n) {
 static void clock_setup(void) {
     rcc_clock_setup_in_hse_8mhz_out_72mhz();
 
-    rcc_periph_clock_enable(RCC_AFIO);
-
     rcc_periph_clock_enable(RCC_GPIOA);
     rcc_periph_clock_enable(RCC_GPIOB);
     rcc_periph_clock_enable(RCC_GPIOC);
 
+    rcc_periph_clock_enable(RCC_TIM2);
+    rcc_periph_clock_enable(RCC_TIM3);
+
+    rcc_periph_clock_enable(RCC_AFIO);
+
     rcc_periph_clock_enable(RCC_USART1);
-    //rcc_periph_clock_enable(RCC_USART3);
     rcc_periph_clock_enable(RCC_I2C1);
 
     rcc_periph_clock_enable(RCC_SPI1);
@@ -138,6 +155,30 @@ void tim2_isr(void) {
     }
 }
 
+void tim3_setup(void) {
+    nvic_enable_irq(NVIC_TIM3_IRQ);
+    timer_reset(TIM3);
+    timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+
+    timer_direction_up(TIM3);
+    timer_set_prescaler(TIM3, 50);
+    timer_disable_preload(TIM3);
+    timer_continuous_mode(TIM3);
+    timer_set_period(TIM3, 28200);
+    timer_set_oc_value(TIM3, TIM_OC1, 1);
+    timer_enable_irq(TIM3, TIM_DIER_CC1IE);
+
+    timer_enable_counter(TIM3);
+}
+
+void tim3_isr(void) {
+    if (timer_get_flag(TIM3, TIM_SR_CC1IF)) {
+        timer_clear_flag(TIM3, TIM_SR_CC1IF);
+        mpu_update_quaternion(&mpu);
+    }
+}
+
+
 void rtc_setup() {
     rtc_auto_awake(RCC_LSE, 0x7FFF);
     nvic_enable_irq(NVIC_RTC_IRQ);
@@ -154,6 +195,27 @@ void rtc_isr(void) {
     rate_value = loop_counter;
     loop_counter = 0;
 }
+
+volatile static uint32_t systick_counter_ms = 0;
+
+static void systick_setup(void) {
+
+    nvic_enable_irq(NVIC_SYSTICK_IRQ);
+    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
+    systick_set_reload(9000 - 1);
+    systick_interrupt_enable();
+    systick_counter_enable();
+}
+
+void sys_tick_handler(void) {
+    systick_counter_ms++;
+}
+
+void delay_ms(uint32_t t) {
+    systick_counter_ms = 0;
+    while (systick_counter_ms < t);
+}
+
 
 volatile uint16_t adc_res[16];
 
@@ -231,19 +293,26 @@ int16_t get_mcu_temp(void) {
     return (int16_t) temp;
 }
 
+void demo_gpio_setup(void) {
+    gpio_set_mode(GPIOC, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, GPIO6);
+    gpio_clear(GPIOC, GPIO6);
+}
 
 int main(void) {
     clock_setup();
     io_setup();
     uart_setup();
-    tim2_setup();
     rtc_setup();
+    systick_setup();
 
-    nvic_setup();
+    //nvic_setup();
     dma_setup();
     adc_dma_setup();
 
     uint32_t i = 0;
+
+    mpu_i2c_setup();
+    mpu_setup(&mpu);
 
     lcd_spi_setup();
     console_setup();
@@ -251,55 +320,81 @@ int main(void) {
     lcd_setup();
     lcd_clear();
 
-    printf("\r\n");
-    printf("\r\n");
+    delay_ms(10);
 
-    sd_spi_setup();
-    sd_reset();
+    tim2_setup();
+    tim3_setup();
 
     console_puts(&console, "STM32 CONSOLE V0.1\n");
     console_puts(&console, "READY>");
 
-    gpio_set_mode(GPIOC, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, GPIO6);
-    gpio_clear(GPIOC, GPIO6);
-
-    uint8_t array[612];
-
-    memset(array, 0, 612);
-
-    delay(1000);
-    memset(array, 0, 612);
-
     while (1) {
-
         #define STR_LEN 12
 
         uint8_t str[STR_LEN + 1];
 
-        snprintf(str, STR_LEN, "Rate %4d", rate_value);
+        snprintf(str, STR_LEN, "Rat %4d", rate_value);
+        console_xyputs(&console, 2, 0, str);
+
+        snprintf(str, STR_LEN, "Tmc %4d", get_mcu_temp());
+        console_xyputs(&console, 2, 9, str);
+
+        #if 0
+        uint8_t rdata = i2c_read_reg(I2C1, 0x68, 0x75);
+        snprintf(str, STR_LEN, "R %02X", rdata);
+        console_xyputs(&console, 4, 0, str);
+        #endif
+
+        #if 0
+        int16_t ax, ay, az, gx, gy, gz;
+        mpu_get_raw_data(&mpu, &ax, &ay, &az, &gx, &gy, &gz);
+
+        snprintf(str, STR_LEN, "%8ld", ax);
+        console_xyputs(&console, 4, 0, str);
+
+        snprintf(str, STR_LEN, "%8ld", ay);
+        console_xyputs(&console, 5, 0, str);
+        #endif
+
+        #if 0
+        double gxc, gyc, gzc, axc, ayc, azc;
+        mpu_get_conv_data(&mpu, &axc, &ayc, &azc, &gxc, &gyc, &gzc);
+
+        snprintf(str, STR_LEN, "%8ld", (int32_t)(axc * 100.0f));
+        console_xyputs(&console, 4, 0, str);
+
+        snprintf(str, STR_LEN, "%8ld", (int32_t)(ayc * 100.0f));
+        console_xyputs(&console, 5, 0, str);
+        #endif
+
+        #if 1
+        double roll, pitch, yaw;
+        mpu_get_roll_pitch_yaw(&mpu, &roll, &pitch, &yaw);
+
+        snprintf(str, STR_LEN, "R %6ld", (int32_t)(roll * 62.5));
         console_xyputs(&console, 3, 0, str);
 
-        snprintf(str, STR_LEN, "Tmcu %4d", get_mcu_temp());
+        snprintf(str, STR_LEN, "P %6ld", (int32_t)(pitch * 62.5));
         console_xyputs(&console, 4, 0, str);
+        #endif
 
         snprintf(str, STR_LEN, "0x%08X", i);
         console_xyputs(&console, 8, 0, str);
 
-
-        uint16_t y_value = i % (159 - 20);
+        uint16_t y_value = i % (159 - 10);
         uint16_t y_prev;
 
-        uint16_t x_value = i % (127 - 20);
+        uint16_t x_value = i % (127 - 10);
         uint16_t x_prev;
 
         if ((x_prev != x_value) && (y_prev != y_value)) {
-            lcd_write_rect(20, y_prev, 20, 20, 0x0F00);
-            lcd_write_rect(20, y_value, 20, 20, 0x1234);
+            lcd_write_rect(20, y_prev, 10, 10, 0x0F00);
+            lcd_write_rect(20, y_value, 10, 10, 0x1234);
         }
         y_prev = y_value;
         x_prev = x_value;
 
-        //delay(8000000);
+        delay(1000);
         loop_counter++;
 
         i++;
