@@ -73,6 +73,7 @@ static void clock_setup(void) {
     rcc_periph_clock_enable(RCC_AFIO);
 
     rcc_periph_clock_enable(RCC_USART1);
+    rcc_periph_clock_enable(RCC_USART2);
     rcc_periph_clock_enable(RCC_I2C1);
 
     rcc_periph_clock_enable(RCC_SPI1);
@@ -84,7 +85,7 @@ static void clock_setup(void) {
 }
 
 
-void uart_setup(void) {
+void uart1_setup(void) {
 
     usart_disable(USART1);
     nvic_enable_irq(NVIC_USART1_IRQ);
@@ -122,6 +123,31 @@ void usart1_isr(void) {
         if (data == '\r')
             buffer_put_byte(&stdout_buffer, '\n');
     }
+}
+
+
+
+void uart2_setup(void) {
+
+    usart_disable(USART2);
+    //nvic_enable_irq(NVIC_USART2_IRQ);
+
+    //gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO2);
+    //gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO1);
+
+    gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART2_TX);
+    gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO_USART2_RX);
+
+    usart_set_baudrate(USART2, 38400);
+    usart_set_databits(USART2, 8);
+    usart_set_stopbits(USART2, USART_STOPBITS_1);
+    usart_set_parity(USART2, USART_PARITY_NONE);
+    usart_set_flow_control(USART2, USART_FLOWCONTROL_NONE);
+    usart_set_mode(USART2, USART_MODE_TX_RX);
+
+    //usart_enable_rx_interrupt(USART2);
+
+    usart_enable(USART2);
 }
 
 static void tim2_setup(void) {
@@ -264,9 +290,8 @@ void adc_dma_setup(void) {
     adc_enable_temperature_sensor();
 
     channel_seq[0] = 16;
-    channel_seq[1] = 17;
 
-    adc_set_regular_sequence(ADC1, 2, channel_seq);
+    adc_set_regular_sequence(ADC1, 1, channel_seq);
 
     adc_enable_dma(ADC1);
     delay(100);
@@ -298,10 +323,20 @@ void demo_gpio_setup(void) {
     gpio_clear(GPIOC, GPIO6);
 }
 
+void send_command(uint8_t *str) {
+    uint16_t i = 0;
+    while (str[i] != 0) {
+        usart_send_blocking(USART2, str[i]);
+        i++;
+    }
+}
+
 int main(void) {
     clock_setup();
     io_setup();
-    uart_setup();
+    uart1_setup();
+    uart2_setup();
+
     rtc_setup();
     systick_setup();
 
@@ -329,12 +364,13 @@ int main(void) {
     console_puts(&console, "READY>");
 
     while (1) {
-        #define STR_LEN 12
+        #define STR_LEN 18
 
         uint8_t str[STR_LEN + 1];
 
         snprintf(str, STR_LEN, "Rat %4d", rate_value);
         console_xyputs(&console, 2, 0, str);
+
 
         snprintf(str, STR_LEN, "Tmc %4d", get_mcu_temp());
         console_xyputs(&console, 2, 9, str);
@@ -381,10 +417,10 @@ int main(void) {
         snprintf(str, STR_LEN, "0x%08X", i);
         console_xyputs(&console, 8, 0, str);
 
-        uint16_t y_value = i % (159 - 10);
+        uint16_t y_value = i % (159);
         uint16_t y_prev;
 
-        uint16_t x_value = i % (127 - 10);
+        uint16_t x_value = i % (127);
         uint16_t x_prev;
 
         if ((x_prev != x_value) && (y_prev != y_value)) {
@@ -394,8 +430,9 @@ int main(void) {
         y_prev = y_value;
         x_prev = x_value;
 
-        delay(1000);
         loop_counter++;
+
+        delay_ms(100);
 
         i++;
     }
