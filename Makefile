@@ -16,12 +16,9 @@ LDFLAGS+= -Wl,-Map=master.map
 LDFLAGS+= -Wl,--cref -Wl,--gc-sections
 LDFLAGS+= -lopencm3_stm32f1
 #LDFLAGS+= -lc -lgcc
-LDFLAGS+= -Wl,--start-group -lc -lgcc -lnosys -Wl,--end-group
+LDFLAGS+= -Wl,--start-group -lc -lgcc -lm -lnosys -Wl,--end-group
 
 all: master.bin
-
-#CFLAGS+= -D_MIN_=`date +%M` -D_SEC_=`date +%S`
-#CFLAGS+= -D_YEAR_=`date +%Y` -D_MON_=`date +%m` -D_MDAY_=`date +%d`
 
 MASTER_OBJS+= ds3231.o
 MASTER_OBJS+= master.o 
@@ -32,7 +29,8 @@ MASTER_OBJS+= uastdio.o
 MASTER_OBJS+= datetime.o
 MASTER_OBJS+= st7735.o
 MASTER_OBJS+= console.o
-
+MASTER_OBJS+= mpu6050.o
+MASTER_OBJS+= i2creg.o
 
 master.elf: $(MASTER_OBJS)
 	arm-eabi-gcc $(^F) $(LDFLAGS) -o $@ 
