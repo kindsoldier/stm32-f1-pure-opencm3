@@ -8,7 +8,7 @@ MEMORY {
 EXTERN(vector_table)
 
 /* Define the entry point of the output file. */
-ENTRY(main)
+ENTRY(reset_handler)
 
 SECTIONS {
     __text_start = .;
