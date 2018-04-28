@@ -24,7 +24,6 @@ MASTER_OBJS+= ds3231.o
 MASTER_OBJS+= master.o 
 MASTER_OBJS+= syscall.o
 MASTER_OBJS+= buffer.o
-MASTER_OBJS+= startup.o
 MASTER_OBJS+= uastdio.o
 MASTER_OBJS+= datetime.o
 MASTER_OBJS+= st7735.o
