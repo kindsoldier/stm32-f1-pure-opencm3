@@ -183,7 +183,7 @@ void tim2_isr(void) {
 
 void tim3_setup(void) {
     nvic_enable_irq(NVIC_TIM3_IRQ);
-    timer_reset(TIM3);
+    //timer_reset(TIM3);
     timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
     timer_direction_up(TIM3);
